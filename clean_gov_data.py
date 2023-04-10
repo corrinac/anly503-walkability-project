@@ -43,7 +43,7 @@ def depression_data():
     depression_data['LocationID'] = depression_data['LocationID'].astype(str)
 
     # rename column with value to be the format that the need score file expects
-    depression_data = depression_data.rename({'Data_Value': 'Indicator Rate Value'}, axis='columns')
+    # depression_data = depression_data.rename({'Data_Value': 'perc_depression'}, axis='columns')
 
     # sanity check; print lines for status report
     print("Number of census tracts with depression data:", len(depression_data))
@@ -140,6 +140,38 @@ def cre_equity_data():
     # returned cleaned dataframe
     return(cre_equity)
 
+def neighborhood_names(input_df):
+    """
+    Add in the string value names of that census tract
+    """
+    print("\n~*~*~*~*~*~*~*~* Adding neighborhood names ~*~*~*~*~*~*~*~*")
+    file_name = 'DC_Health_Planning_Neighborhoods_to_Census_Tracts.csv'
+    file_path_name = os.path.join(data_folder, file_name)
+    neighborhoods = None
+
+    try:
+        neighborhoods = pd.read_csv(file_path_name, encoding='latin1')
+    except:
+        while not os.path.exists(file_path_name):
+            input("Visit https://hub.arcgis.com/datasets/1d586a67d5ce4eceb5d51bec653d6774/explore\n"+
+                "The file should save with the default name of `DC_Health_Planning_Neighborhoods_to_Census_Tracts.csv`\n"+
+                "Save this to the `raw_data` folder.\n"+
+                "Press `enter` when finished.")
+            neighborhoods = pd.read_csv(file_path_name, encoding='latin1')
+    
+    neighborhoods['GEOID'] = neighborhoods['GEOID'].astype(str)
+    # join using GEOID
+    input_df = input_df.merge(neighborhoods[['GEOID', 'DC_HPN_NAME']],how = 'left',
+                                                left_on = 'geoid_tract_20',
+                                                right_on = 'GEOID'
+                                                )
+    input_df = input_df.rename({'DC_HPN_NAME':'neighborhood_name'},
+                                axis = 'columns'
+                                )
+
+    # returned cleaned dataframe
+    return(input_df)
+
 def join_and_clean():
     """
     Call other functions to generate dataframes, join them, clean column names, and write file
@@ -154,25 +186,28 @@ def join_and_clean():
     joined_file = joined_file.merge(walkability_df, left_on='LocationID', right_on='location_id', how = 'left')
 
     # clean column names
-    # cols_to_keep = {'LocationID': 'geoid_tract_20',
-    #                 'NAME': 'census_tract_name',
-    #                 'Data_Value': 'depressed_perc',
-    #                 'NH_Black_alone_PE':'black_non_hisp_perc',
-    #                 'NH_White_alone_PE':'white_non_hisp_perc',
-    #                 'Hispanic_PE':'hispanic_latino_perc',
-    #                 'PRED3_PE':'3_plus_cre_risk_factors_perc',
-    #                 'Blw_Pov_Lvl_PE':'below_poverty_level_perc',
-    #                 'No_Health_Ins_PE':'no_health_insurance_perc',
-    #                 'Male_PE':'male_perc',
-    #                 'Female_PE':'female_perc',
-    #                 'GINI_IND_Inequality_E':'income_inequality_gini_index',
-    #                 'HS_Grad_PE':'hs_grad_perc',
-    #                 'No_Veh_PE':'households_no_vehicle_perc',
-    #                 'Broadband_PE':'households_w_internet_perc',
-    #                 'Median_NatWalkInd':'walkability_score'
-    #             }
-    clean_joined_file = joined_file.rename({'LocationID' : 'Location'}, axis='columns')
-    # clean_joined_file = clean_joined_file[rename_cols.values()]
+    cols_to_keep = {'LocationID': 'geoid_tract_20',
+                    'NAME': 'census_tract_name',
+                    'Data_Value': 'depressed_perc',
+                    'NH_Black_alone_PE':'black_non_hisp_perc',
+                    'NH_White_alone_PE':'white_non_hisp_perc',
+                    'Hispanic_PE':'hispanic_latino_perc',
+                    'PRED3_PE':'3_plus_cre_risk_factors_perc',
+                    'Blw_Pov_Lvl_PE':'below_poverty_level_perc',
+                    'No_Health_Ins_PE':'no_health_insurance_perc',
+                    'Male_PE':'male_perc',
+                    'Female_PE':'female_perc',
+                    'GINI_IND_Inequality_E':'income_inequality_gini_index',
+                    'HS_Grad_PE':'hs_grad_perc',
+                    'No_Veh_PE':'households_no_vehicle_perc',
+                    'Broadband_PE':'households_w_internet_perc',
+                    'Median_NatWalkInd':'walkability_score'
+                }
+    clean_joined_file = joined_file.rename(cols_to_keep, axis='columns')
+    clean_joined_file = clean_joined_file[cols_to_keep.values()]
+
+    # add in neighborhood names
+    clean_joined_file = neighborhood_names(clean_joined_file)
 
     # write file and provide instructions
     clean_joined_file.to_csv(os.path.join(data_folder, 'joined_depression_cre_walkability.csv'), index=False)
@@ -181,6 +216,8 @@ def join_and_clean():
         "Add this file to this Google Drive folder:\n"+
         "https://drive.google.com/drive/u/1/folders/1a47wAE9k2hAA5MzRlZTMjNIeSdHFwq5l\n"+
         "then press enter.")
+
+
 
 
 if __name__ == "__main__":
